@@ -1,4 +1,10 @@
-let totalSeconds = 600; // default 10 min
+// Connect directly to Twitch chat with tmi.js
+const client = new tmi.Client({
+  channels: ["ryaah"]  // your Twitch channel name
+});
+client.connect();
+
+let totalSeconds = 600; 
 let remainingSeconds = totalSeconds;
 let endTime = Date.now() + totalSeconds * 1000;
 let lastUpdateExtra = 0;
@@ -58,46 +64,21 @@ function resetTimer() {
   routeEl.textContent = "Destination: Not Set";
 }
 
-// ---------- StreamElements Chat Integration ----------
-const CHANNEL_NAME = "ryaah"; // your channel
+// ---------- Twitch Chat Commands ----------
+client.on("message", (channel, tags, message, self) => {
+  if (self) return; // ignore self
 
-function isAuthorized(data) {
-  // Twitch-style tags
-  const tags = data?.tags || {};
-  const nick = (data?.nick || "").toLowerCase();
-  const badgesStr = (tags.badges || "") + ""; // can be "broadcaster/1,subscriber/0" etc.
+  // Only broadcaster or mods
+  const isMod = tags.mod || tags.badges?.broadcaster === "1";
+  if (!isMod) return;
 
-  const modFlag = tags.mod === true || tags.mod === "1";
-  const hasModBadge = badgesStr.includes("moderator/1");
-  const hasBroadcasterBadge = badgesStr.includes("broadcaster/1");
-
-  const isBroadcasterByNick = nick === CHANNEL_NAME.toLowerCase();
-  return hasBroadcasterBadge || isBroadcasterByNick || modFlag || hasModBadge;
-}
-
-// SE sends events here while the overlay is active
-window.addEventListener("onEventReceived", (obj) => {
-  if (!obj?.detail) return;
-
-  // Some SE setups use "message", some use "message-received"
-  const listener = obj.detail.listener;
-  if (listener !== "message" && listener !== "message-received") return;
-
-  const data = obj.detail.event?.data;
-  if (!data) return;
-
-  if (!isAuthorized(data)) return;
-
-  const msg = (data.text || "").trim();
-  if (!msg) return;
-
-  const parts = msg.split(" ");
+  const parts = message.trim().split(" ");
   const cmd = parts[0].toLowerCase();
 
-  // !st <seconds>  (positive = extend, negative = reduce)
+  // !st <seconds>
   if (cmd === "!st" && parts[1]) {
     const changeSecs = parseInt(parts[1], 10);
-    if (!Number.isNaN(changeSecs)) {
+    if (!isNaN(changeSecs)) {
       const now = Date.now();
       const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
       remainingSeconds = Math.max(0, currentRemaining + changeSecs);
@@ -116,31 +97,6 @@ window.addEventListener("onEventReceived", (obj) => {
 
   // !reset
   if (cmd === "!reset") {
-    resetTimer();
-  }
-});
-
-// ---------- Optional local test (keyboard) ----------
-window.addEventListener("keydown", (e) => {
-  if (e.key === "u") { // +200s
-    const now = Date.now();
-    const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
-    remainingSeconds = currentRemaining + 200;
-    totalSeconds = remainingSeconds;
-    endTime = now + remainingSeconds * 1000;
-    lastUpdateExtra = 200;
-    tick();
-  }
-  if (e.key === "d") { // -300s
-    const now = Date.now();
-    const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
-    remainingSeconds = Math.max(0, currentRemaining - 300);
-    totalSeconds = remainingSeconds;
-    endTime = now + remainingSeconds * 1000;
-    lastUpdateExtra = -300;
-    tick();
-  }
-  if (e.key === "r") { // reset
     resetTimer();
   }
 });
