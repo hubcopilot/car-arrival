@@ -53,7 +53,7 @@
       padding:4px 10px; border:none; border-radius:4px;
       background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer;
     }
-    #status { font-size:13px; opacity:0.8; }
+    #status { font-size:13px; opacity:0.9; }
   </style>
 </head>
 <body>
@@ -68,7 +68,7 @@
         <img src="car.png" alt="Car">
       </div>
     </div>
-    <div class="trip" id="trip">Trip Length: 0s</div>
+    <div class="trip" id="trip" style="display:none;">Trip Length: 0s</div>
   </div>
 
   <!-- connect panel -->
@@ -118,7 +118,12 @@
     }
 
     function updateTripDisplay() {
-      tripEl.textContent = formatTrip(accumulatedSeconds);
+      if (accumulatedSeconds > 0 && ticking) {
+        tripEl.style.display = "block";
+        tripEl.textContent = formatTrip(accumulatedSeconds);
+      } else {
+        tripEl.style.display = "none";
+      }
     }
 
     function tick() {
@@ -146,6 +151,7 @@
       } else {
         ticking = false;
         etaEl.textContent = "Arrived!";
+        tripEl.style.display = "none"; // hide trip length when finished
       }
     }
 
@@ -166,13 +172,21 @@
     function connectTwitch(channel) {
       statusEl.textContent = "Connecting…";
       try { if (client) client.disconnect(); } catch(e){}
-      client = new tmi.Client({ connection:{secure:true,reconnect:true}, channels:[channel] });
-      client.connect().then(()=>{
-        statusEl.textContent = `Connected: ${channel}`;
-      }).catch(e=>{
-        console.error("Twitch connect error", e);
-        statusEl.textContent = "Not connected";
+      
+      client = new tmi.Client({ 
+        connection:{secure:true,reconnect:true}, 
+        channels:[channel] 
       });
+
+      client.connect()
+        .then(()=>{
+          statusEl.textContent = `✅ Connected: ${channel}`;
+        })
+        .catch(e=>{
+          console.error("Twitch connect error", e);
+          statusEl.textContent = `❌ Tried ${channel} but failed`;
+        });
+
       client.on('message',(chan,tags,msg,self)=>{
         if(self) return;
         const text = msg.trim();
@@ -203,10 +217,12 @@
             }
           }
         }
+
         if (cmd === "!sd" && parts.length > 1) {
           const destination = parts.slice(1).join(" ");
           routeEl.textContent = "Destination: " + destination;
         }
+
         if (cmd === "!reset") {
           resetTimer();
         }
