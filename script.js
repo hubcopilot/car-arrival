@@ -1,21 +1,20 @@
-// Connect directly to Twitch chat with tmi.js
-const client = new tmi.Client({
-  channels: ["ryaah"]  // your Twitch channel name
-});
-client.connect();
+// ---------- CONFIG ----------
+const channel = "ryaah";  // your Twitch channel name
 
+// ---------- TIMER STATE ----------
 let totalSeconds = 600; 
 let remainingSeconds = totalSeconds;
 let endTime = Date.now() + totalSeconds * 1000;
 let lastUpdateExtra = 0;
 
+// ---------- DOM ----------
 const routeEl = document.getElementById("route");
 const etaEl = document.getElementById("eta");
 const fillEl = document.getElementById("fill");
 const carEl = document.getElementById("car");
 const barEl = document.getElementById("bar");
 
-// ---------- ETA UI ----------
+// ---------- ETA FUNCTIONS ----------
 function formatETA(sec) {
   if (sec <= 0) return "Arrived!";
   const h = Math.floor(sec / 3600);
@@ -64,16 +63,29 @@ function resetTimer() {
   routeEl.textContent = "Destination: Not Set";
 }
 
-// ---------- Twitch Chat Commands ----------
-client.on("message", (channel, tags, message, self) => {
-  if (self) return; // ignore self
+// ---------- TWITCH CHAT CONNECT ----------
+function $(id){ return document.getElementById(id); }
 
-  // Only broadcaster or mods
-  const isMod = tags.mod || tags.badges?.broadcaster === "1";
-  if (!isMod) return;
+client = new tmi.Client({
+  connection: { secure: true, reconnect: true },
+  channels: [channel]
+});
 
-  const parts = message.trim().split(" ");
+client.connect()
+  .then(()=>{$("conn").textContent=`Connected: ${channel}`;})
+  .catch(()=>{$("conn").textContent='Not connected';});
+
+// ---------- CHAT COMMANDS ----------
+client.on('message', (chan, tags, msg, self) => {
+  if(self) return;
+
+  const name = tags['display-name'] || tags.username;
+  const text = msg.trim();
+  const parts = text.split(" ");
   const cmd = parts[0].toLowerCase();
+
+  const isMod = tags.mod || tags.badges?.broadcaster === "1";
+  if (!isMod) return; // only mods + broadcaster
 
   // !st <seconds>
   if (cmd === "!st" && parts[1]) {
