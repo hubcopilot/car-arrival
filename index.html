@@ -38,19 +38,19 @@
     .car img { width:100%; height:auto; display:block; }
 
     /* connection panel */
-    .connect-panel {
-      margin-top:12px; padding:10px; background:rgba(0,0,0,0.4); border-radius:6px;
-      display:flex; gap:8px; align-items:center; font-size:14px;
+    .topbar {
+      margin-top:12px; display:flex; gap:8px; align-items:center;
+      background:rgba(0,0,0,0.4); padding:8px 12px; border-radius:6px;
     }
-    .connect-panel input {
+    .topbar input {
       padding:4px 6px; border-radius:4px; border:none;
       outline:none; font-size:14px;
     }
-    .connect-panel button {
+    .topbar button {
       padding:4px 10px; border:none; border-radius:4px;
       background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer;
     }
-    #conn-status { font-size:13px; opacity:0.8; }
+    #status { font-size:13px; opacity:0.8; }
   </style>
 </head>
 <body>
@@ -68,11 +68,10 @@
   </div>
 
   <!-- connect panel -->
-  <div class="connect-panel">
-    <label for="channel">Channel:</label>
-    <input type="text" id="channel" placeholder="Enter Twitch username">
-    <button id="connect-btn">Connect</button>
-    <span id="conn-status">Not connected</span>
+  <div class="topbar">
+    <input id="channelInput" type="text" placeholder="Twitch channel (e.g. dedefasuyi)">
+    <button id="connectBtn">Connect</button>
+    <span id="status">Not connected</span>
   </div>
 
   <!-- tmi.js -->
@@ -88,7 +87,7 @@
     const fillEl = document.getElementById("fill");
     const carEl = document.getElementById("car");
     const barEl = document.getElementById("bar");
-    const statusEl = document.getElementById("conn-status");
+    const statusEl = document.getElementById("status");
 
     function formatETA(sec) {
       if (sec <= 0) return "Arrived!";
@@ -138,28 +137,17 @@
       tick();
     }
 
-    function connectToChat(channelName) {
-      if (client) {
-        try { client.disconnect(); } catch(e){}
-      }
-
-      // ✅ Anonymous login (no identity)
-      client = new tmi.Client({
-        connection: { secure: true, reconnect: true },
-        channels: [channelName]
+    function connectTwitch(channel) {
+      statusEl.textContent = "Connecting…";
+      try { if (client) client.disconnect(); } catch(e){}
+      client = new tmi.Client({ connection:{secure:true,reconnect:true}, channels:[channel] });
+      client.connect().then(()=>{
+        statusEl.textContent = `Connected: ${channel}`;
+      }).catch(e=>{
+        console.error("Twitch connect error", e);
+        statusEl.textContent = "Not connected";
       });
-
-      client.connect()
-        .then(() => { 
-          statusEl.textContent = `Connected to: ${channelName}`;
-          console.log("Connected to Twitch chat:", channelName);
-        })
-        .catch(err => { 
-          statusEl.textContent = 'Failed to connect';
-          console.error("Connection failed:", err);
-        });
-
-      client.on('message', (chan, tags, msg, self) => {
+      client.on('message',(chan,tags,msg,self)=>{
         if(self) return;
         const text = msg.trim();
         const parts = text.split(" ");
@@ -173,27 +161,20 @@
             tick();
           }
         }
-
         if (cmd === "!sd" && parts.length > 1) {
           const destination = parts.slice(1).join(" ");
           routeEl.textContent = "Destination: " + destination;
         }
-
         if (cmd === "!reset") {
           resetTimer();
         }
       });
     }
 
-    window.onload = function() {
-      document.getElementById("connect-btn").addEventListener("click", () => {
-        const channel = document.getElementById("channel").value.trim().toLowerCase();
-        if(channel) {
-          statusEl.textContent = "Connecting...";
-          connectToChat(channel);
-        }
-      });
-    }
+    document.getElementById("connectBtn").addEventListener("click", ()=>{
+      const ch = document.getElementById("channelInput").value.trim().toLowerCase();
+      if(ch){ connectTwitch(ch); }
+    });
   </script>
 </body>
 </html>
