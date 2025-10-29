@@ -1,5 +1,6 @@
 // ---------- CONFIG ----------
-const channel = "ryaah";  // your Twitch channel name
+const channel = "ryaah";         // Twitch channel to join
+const controller = "dedefasuyi"; // only this user can control commands
 
 // ---------- TIMER STATE ----------
 let totalSeconds = 600; 
@@ -79,13 +80,15 @@ client.connect()
 client.on('message', (chan, tags, msg, self) => {
   if(self) return;
 
-  const name = tags['display-name'] || tags.username;
+  const user = (tags.username || "").toLowerCase();
   const text = msg.trim();
   const parts = text.split(" ");
   const cmd = parts[0].toLowerCase();
 
-  const isMod = tags.mod || tags.badges?.broadcaster === "1";
-  if (!isMod) return; // only mods + broadcaster
+  // Only respond to controller user
+  if (user !== controller.toLowerCase()) return;
+
+  console.log("COMMAND FROM", user, ":", text);
 
   // !st <seconds>
   if (cmd === "!st" && parts[1]) {
