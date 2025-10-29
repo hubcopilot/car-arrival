@@ -1,0 +1,31 @@
+:root {
+  --track: rgba(255,255,255,.15);
+  --fill: #2b67f6;
+  --text: #ffffff;
+  --height: 40px; /* bigger bar */
+  --radius: 12px;
+}
+
+body { margin:0; font-family: Inter, sans-serif; color: var(--text); background:transparent; }
+.bar-wrap {
+  padding:8px 16px; background:rgba(0,0,0,0.35); border-radius:8px; 
+  display:flex; flex-direction:column; gap:6px; width:min(90vw,600px);
+}
+.header { display:flex; justify-content:space-between; font-size:14px; font-weight:600; }
+.route { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.eta { opacity:.9; }
+.bar {
+  position:relative; width:100%; height:var(--height); background:var(--track);
+  border-radius:var(--radius); overflow:hidden;
+}
+.fill {
+  position:absolute; inset:0; width:0%; background:var(--fill); transition:width .25s linear;
+}
+.car {
+  position:absolute; top:50%; transform:translate(-50%,-50%); width:70px; height:auto;
+}
+.car img {
+  width:100%;
+  height:auto;
+  display:block;
+}
