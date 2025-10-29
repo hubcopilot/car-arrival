@@ -89,7 +89,7 @@
     let totalSeconds = 0;   
     let endTime = 0;
     let startTime = 0;
-    let accumulatedSeconds = 0; // total trip length
+    let accumulatedSeconds = 0;
     let lastUpdateExtra = 0;
     let ticking = false;
 
@@ -155,7 +155,7 @@
       } else {
         ticking = false;
         etaEl.textContent = "Arrived!";
-        tripEl.style.display = "none"; // hide trip length when finished
+        tripEl.style.display = "none";
       }
     }
 
@@ -173,26 +173,28 @@
       updateTripDisplay();
     }
 
+    // ✅ Fixed connect function (like guess-game)
     function connectTwitch(channel) {
       statusEl.textContent = "Connecting…";
+
       try { if (client) client.disconnect(); } catch(e){}
-      
-      client = new tmi.Client({ 
-        connection:{secure:true,reconnect:true}, 
-        channels:[channel] 
+
+      client = new tmi.Client({
+        connection: { secure: true, reconnect: true },
+        channels: [channel]
       });
 
       client.connect()
-        .then(()=>{
+        .then(() => {
           statusEl.textContent = `✅ Connected: ${channel}`;
         })
-        .catch(e=>{
-          console.error("Twitch connect error", e);
+        .catch(err => {
+          console.error("Twitch connect error", err);
           statusEl.textContent = `❌ Tried ${channel} but failed`;
         });
 
-      client.on('message',(chan,tags,msg,self)=>{
-        if(self) return;
+      client.on('message', (chan, tags, msg, self) => {
+        if (self) return;
         const text = msg.trim();
         const parts = text.split(" ");
         const cmd = parts[0].toLowerCase();
@@ -202,7 +204,6 @@
           if (!isNaN(changeSecs)) {
             const now = Date.now();
             if (totalSeconds === 0 || !ticking) {
-              // start fresh
               totalSeconds = Math.max(0, changeSecs);
               accumulatedSeconds = totalSeconds;
               startTime = now;
@@ -212,7 +213,6 @@
               updateTripDisplay();
               tick();
             } else {
-              // add to existing countdown
               endTime += changeSecs * 1000;
               totalSeconds += changeSecs;
               accumulatedSeconds += changeSecs;
@@ -223,8 +223,7 @@
         }
 
         if (cmd === "!sd" && parts.length > 1) {
-          const destination = parts.slice(1).join(" ");
-          routeEl.textContent = "Destination: " + destination;
+          routeEl.textContent = "Destination: " + parts.slice(1).join(" ");
         }
 
         if (cmd === "!reset") {
@@ -233,13 +232,13 @@
       });
     }
 
-    // ✅ Button actions
-    document.getElementById("connectBtn").addEventListener("click", ()=>{
+    // ✅ Buttons
+    document.getElementById("connectBtn").addEventListener("click", () => {
       const ch = document.getElementById("channelInput").value.trim().toLowerCase();
-      if(ch){ connectTwitch(ch); }
+      if (ch) connectTwitch(ch);
     });
 
-    document.getElementById("disconnectBtn").addEventListener("click", ()=>{
+    document.getElementById("disconnectBtn").addEventListener("click", () => {
       if (client) {
         try { client.disconnect(); } catch(e){}
         statusEl.textContent = "🔌 Disconnected";
