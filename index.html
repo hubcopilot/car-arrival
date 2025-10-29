@@ -25,6 +25,8 @@
     .header { display:flex; justify-content:space-between; font-size:14px; font-weight:600; }
     .route { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .eta { opacity:.9; }
+    .trip { font-size:13px; opacity:0.8; text-align:right; }
+
     .bar {
       position:relative; width:100%; height:var(--height); background:var(--track);
       border-radius:var(--radius); overflow:hidden;
@@ -34,6 +36,7 @@
     }
     .car {
       position:absolute; top:50%; transform:translate(-50%,-50%); width:70px; height:auto;
+      left:0;
     }
     .car img { width:100%; height:auto; display:block; }
 
@@ -65,6 +68,7 @@
         <img src="car.png" alt="Car">
       </div>
     </div>
+    <div class="trip" id="trip">Trip Length: 0s</div>
   </div>
 
   <!-- connect panel -->
@@ -78,19 +82,23 @@
   <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
   <script>
     let client = null;
-    let totalSeconds = 600; 
-    let endTime = Date.now() + totalSeconds * 1000;
+    let totalSeconds = 0;   
+    let endTime = 0;
+    let startTime = 0;
+    let accumulatedSeconds = 0; // total trip length
     let lastUpdateExtra = 0;
+    let ticking = false;
 
     const routeEl = document.getElementById("route");
     const etaEl = document.getElementById("eta");
     const fillEl = document.getElementById("fill");
     const carEl = document.getElementById("car");
     const barEl = document.getElementById("bar");
+    const tripEl = document.getElementById("trip");
     const statusEl = document.getElementById("status");
 
     function formatETA(sec) {
-      if (sec <= 0) return "Arrived!";
+      if (sec <= 0) return "ETA 0m";
       const h = Math.floor(sec / 3600);
       const m = Math.floor((sec % 3600) / 60);
       const s = sec % 60;
@@ -99,10 +107,25 @@
       return `ETA ${s}s`;
     }
 
+    function formatTrip(sec) {
+      if (sec <= 0) return "Trip Length: 0s";
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return `Trip Length: ${h}h ${m}m ${s}s`;
+      if (m > 0) return `Trip Length: ${m}m ${s}s`;
+      return `Trip Length: ${s}s`;
+    }
+
+    function updateTripDisplay() {
+      tripEl.textContent = formatTrip(accumulatedSeconds);
+    }
+
     function tick() {
+      if (!ticking) return;
       const now = Date.now();
       const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-      const elapsed = totalSeconds - remaining;
+      const elapsed = (endTime - startTime - remaining * 1000) / 1000;
       const pct = totalSeconds > 0 ? Math.min(100, (elapsed / totalSeconds) * 100) : 0;
 
       fillEl.style.width = pct + "%";
@@ -121,20 +144,23 @@
         etaEl.textContent = text;
         requestAnimationFrame(tick);
       } else {
+        ticking = false;
         etaEl.textContent = "Arrived!";
       }
     }
-    tick();
 
     function resetTimer() {
-      totalSeconds = 600;
-      endTime = Date.now() + totalSeconds * 1000;
+      totalSeconds = 0;
+      endTime = 0;
+      startTime = 0;
+      accumulatedSeconds = 0;
       lastUpdateExtra = 0;
+      ticking = false;
       fillEl.style.width = "0%";
       carEl.style.left = "0px";
       etaEl.textContent = "ETA 0m";
       routeEl.textContent = "Destination: Not Set";
-      tick();
+      updateTripDisplay();
     }
 
     function connectTwitch(channel) {
@@ -156,9 +182,25 @@
         if (cmd === "!st" && parts[1]) {
           const changeSecs = parseInt(parts[1], 10);
           if (!isNaN(changeSecs)) {
-            endTime += changeSecs * 1000;
-            lastUpdateExtra = changeSecs;
-            tick();
+            const now = Date.now();
+            if (totalSeconds === 0 || !ticking) {
+              // start fresh
+              totalSeconds = Math.max(0, changeSecs);
+              accumulatedSeconds = totalSeconds;
+              startTime = now;
+              endTime = now + totalSeconds * 1000;
+              ticking = true;
+              lastUpdateExtra = changeSecs;
+              updateTripDisplay();
+              tick();
+            } else {
+              // add to existing countdown
+              endTime += changeSecs * 1000;
+              totalSeconds += changeSecs;
+              accumulatedSeconds += changeSecs;
+              lastUpdateExtra = changeSecs;
+              updateTripDisplay();
+            }
           }
         }
         if (cmd === "!sd" && parts.length > 1) {
