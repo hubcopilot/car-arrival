@@ -9,6 +9,7 @@ const fillEl = document.getElementById("fill");
 const carEl = document.getElementById("car");
 const barEl = document.getElementById("bar");
 
+// ---------- ETA UI ----------
 function formatETA(sec) {
   if (sec <= 0) return "Arrived!";
   const h = Math.floor(sec / 3600);
@@ -57,34 +58,89 @@ function resetTimer() {
   routeEl.textContent = "Destination: Not Set";
 }
 
-// StreamElements chat commands
-window.addEventListener("onEventReceived", function (obj) {
-  if (!obj.detail || obj.detail.listener !== "message") return;
-  const msg = obj.detail.event.data.text.trim();
-  const parts = msg.split(" ");
+// ---------- StreamElements Chat Integration ----------
+const CHANNEL_NAME = "ryaah"; // your channel
 
-  // !st <seconds> (positive = extend, negative = reduce)
-  if (parts[0] === "!st" && parts[1]) {
+function isAuthorized(data) {
+  // Twitch-style tags
+  const tags = data?.tags || {};
+  const nick = (data?.nick || "").toLowerCase();
+  const badgesStr = (tags.badges || "") + ""; // can be "broadcaster/1,subscriber/0" etc.
+
+  const modFlag = tags.mod === true || tags.mod === "1";
+  const hasModBadge = badgesStr.includes("moderator/1");
+  const hasBroadcasterBadge = badgesStr.includes("broadcaster/1");
+
+  const isBroadcasterByNick = nick === CHANNEL_NAME.toLowerCase();
+  return hasBroadcasterBadge || isBroadcasterByNick || modFlag || hasModBadge;
+}
+
+// SE sends events here while the overlay is active
+window.addEventListener("onEventReceived", (obj) => {
+  if (!obj?.detail) return;
+
+  // Some SE setups use "message", some use "message-received"
+  const listener = obj.detail.listener;
+  if (listener !== "message" && listener !== "message-received") return;
+
+  const data = obj.detail.event?.data;
+  if (!data) return;
+
+  if (!isAuthorized(data)) return;
+
+  const msg = (data.text || "").trim();
+  if (!msg) return;
+
+  const parts = msg.split(" ");
+  const cmd = parts[0].toLowerCase();
+
+  // !st <seconds>  (positive = extend, negative = reduce)
+  if (cmd === "!st" && parts[1]) {
     const changeSecs = parseInt(parts[1], 10);
-    if (!isNaN(changeSecs)) {
-      remainingSeconds = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-      remainingSeconds += changeSecs;
-      if (remainingSeconds < 0) remainingSeconds = 0;
+    if (!Number.isNaN(changeSecs)) {
+      const now = Date.now();
+      const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
+      remainingSeconds = Math.max(0, currentRemaining + changeSecs);
       totalSeconds = remainingSeconds;
-      endTime = Date.now() + remainingSeconds * 1000;
+      endTime = now + remainingSeconds * 1000;
       lastUpdateExtra = changeSecs;
       tick();
     }
   }
 
   // !sd <destination>
-  if (parts[0] === "!sd" && parts.length > 1) {
+  if (cmd === "!sd" && parts.length > 1) {
     const destination = parts.slice(1).join(" ");
     routeEl.textContent = "Destination: " + destination;
   }
 
   // !reset
-  if (parts[0] === "!reset") {
+  if (cmd === "!reset") {
+    resetTimer();
+  }
+});
+
+// ---------- Optional local test (keyboard) ----------
+window.addEventListener("keydown", (e) => {
+  if (e.key === "u") { // +200s
+    const now = Date.now();
+    const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
+    remainingSeconds = currentRemaining + 200;
+    totalSeconds = remainingSeconds;
+    endTime = now + remainingSeconds * 1000;
+    lastUpdateExtra = 200;
+    tick();
+  }
+  if (e.key === "d") { // -300s
+    const now = Date.now();
+    const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
+    remainingSeconds = Math.max(0, currentRemaining - 300);
+    totalSeconds = remainingSeconds;
+    endTime = now + remainingSeconds * 1000;
+    lastUpdateExtra = -300;
+    tick();
+  }
+  if (e.key === "r") { // reset
     resetTimer();
   }
 });
