@@ -53,6 +53,9 @@
       padding:4px 10px; border:none; border-radius:4px;
       background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer;
     }
+    .topbar button.disconnect {
+      background:#d94d4d;
+    }
     #status { font-size:13px; opacity:0.9; }
   </style>
 </head>
@@ -75,6 +78,7 @@
   <div class="topbar">
     <input id="channelInput" type="text" placeholder="Twitch channel (e.g. dedefasuyi)">
     <button id="connectBtn">Connect</button>
+    <button id="disconnectBtn" class="disconnect">Disconnect</button>
     <span id="status">Not connected</span>
   </div>
 
@@ -229,9 +233,17 @@
       });
     }
 
+    // ✅ Button actions
     document.getElementById("connectBtn").addEventListener("click", ()=>{
       const ch = document.getElementById("channelInput").value.trim().toLowerCase();
       if(ch){ connectTwitch(ch); }
+    });
+
+    document.getElementById("disconnectBtn").addEventListener("click", ()=>{
+      if (client) {
+        try { client.disconnect(); } catch(e){}
+        statusEl.textContent = "🔌 Disconnected";
+      }
     });
   </script>
 </body>
