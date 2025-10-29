@@ -150,8 +150,14 @@
       });
 
       client.connect()
-        .then(() => { statusEl.textContent = `Connected to: ${channelName}`; })
-        .catch(() => { statusEl.textContent = 'Failed to connect'; });
+        .then(() => { 
+          statusEl.textContent = `Connected to: ${channelName}`;
+          console.log("Connected to Twitch chat:", channelName);
+        })
+        .catch(err => { 
+          statusEl.textContent = 'Failed to connect';
+          console.error("Connection failed:", err);
+        });
 
       client.on('message', (chan, tags, msg, self) => {
         if(self) return;
@@ -159,7 +165,8 @@
         const parts = text.split(" ");
         const cmd = parts[0].toLowerCase();
 
-        // !st <seconds>
+        console.log("CHAT:", tags.username, text); // debug log
+
         if (cmd === "!st" && parts[1]) {
           const changeSecs = parseInt(parts[1], 10);
           if (!isNaN(changeSecs)) {
@@ -173,25 +180,27 @@
           }
         }
 
-        // !sd <destination>
         if (cmd === "!sd" && parts.length > 1) {
           const destination = parts.slice(1).join(" ");
           routeEl.textContent = "Destination: " + destination;
         }
 
-        // !reset
         if (cmd === "!reset") {
           resetTimer();
         }
       });
     }
 
-    document.getElementById("connect-btn").addEventListener("click", () => {
-      const channel = document.getElementById("channel").value.trim().toLowerCase();
-      if(channel) {
-        connectToChat(channel);
-      }
-    });
+    // ✅ fix: ensure DOM ready before attaching
+    window.onload = function() {
+      document.getElementById("connect-btn").addEventListener("click", () => {
+        const channel = document.getElementById("channel").value.trim().toLowerCase();
+        if(channel) {
+          statusEl.textContent = "Connecting...";
+          connectToChat(channel);
+        }
+      });
+    }
   </script>
 </body>
 </html>
