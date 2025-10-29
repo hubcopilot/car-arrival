@@ -57,6 +57,23 @@
       background:#d94d4d;
     }
     #status { font-size:13px; opacity:0.9; }
+
+    /* debug log */
+    .log-panel {
+      margin-top:12px; padding:10px;
+      background:rgba(0,0,0,0.35); border-radius:6px;
+      width:min(90vw,600px); max-height:120px; overflow-y:auto;
+      font-size:13px; line-height:1.4em;
+    }
+    .log-entry {
+      margin-bottom:4px;
+      opacity:1;
+      transition: opacity 2s ease; /* smooth fade */
+    }
+    .log-entry.fade-out {
+      opacity:0;
+    }
+    .log-entry b { color:#2b67f6; }
   </style>
 </head>
 <body>
@@ -82,6 +99,9 @@
     <span id="status">Not connected</span>
   </div>
 
+  <!-- debug log -->
+  <div class="log-panel" id="logPanel"></div>
+
   <!-- tmi.js -->
   <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
   <script>
@@ -100,6 +120,19 @@
     const barEl = document.getElementById("bar");
     const tripEl = document.getElementById("trip");
     const statusEl = document.getElementById("status");
+    const logPanel = document.getElementById("logPanel");
+
+    // helper: add entry to debug log
+    function addLog(msg) {
+      const div = document.createElement("div");
+      div.className = "log-entry";
+      div.innerHTML = msg;
+      logPanel.prepend(div);
+
+      // after 8s, fade out; after 10s, remove
+      setTimeout(() => div.classList.add("fade-out"), 8000);
+      setTimeout(() => div.remove(), 10000);
+    }
 
     function formatETA(sec) {
       if (sec <= 0) return "ETA 0m";
@@ -156,6 +189,7 @@
         ticking = false;
         etaEl.textContent = "Arrived!";
         tripEl.style.display = "none";
+        addLog("⏹ Trip finished");
       }
     }
 
@@ -171,9 +205,9 @@
       etaEl.textContent = "ETA 0m";
       routeEl.textContent = "Destination: Not Set";
       updateTripDisplay();
+      addLog("🔄 Timer reset");
     }
 
-    // ✅ Fixed connect function (like guess-game)
     function connectTwitch(channel) {
       statusEl.textContent = "Connecting…";
 
@@ -187,14 +221,17 @@
       client.connect()
         .then(() => {
           statusEl.textContent = `✅ Connected: ${channel}`;
+          addLog(`✅ Connected to <b>${channel}</b>`);
         })
         .catch(err => {
           console.error("Twitch connect error", err);
           statusEl.textContent = `❌ Tried ${channel} but failed`;
+          addLog(`❌ Failed to connect to <b>${channel}</b>`);
         });
 
       client.on('message', (chan, tags, msg, self) => {
         if (self) return;
+        const name = tags['display-name'] || tags.username;
         const text = msg.trim();
         const parts = text.split(" ");
         const cmd = parts[0].toLowerCase();
@@ -212,27 +249,32 @@
               lastUpdateExtra = changeSecs;
               updateTripDisplay();
               tick();
+              addLog(`▶️ ${name} started trip for <b>${changeSecs}s</b>`);
             } else {
               endTime += changeSecs * 1000;
               totalSeconds += changeSecs;
               accumulatedSeconds += changeSecs;
               lastUpdateExtra = changeSecs;
               updateTripDisplay();
+              addLog(`➕ ${name} added <b>${changeSecs}s</b>`);
             }
           }
         }
 
         if (cmd === "!sd" && parts.length > 1) {
-          routeEl.textContent = "Destination: " + parts.slice(1).join(" ");
+          const destination = parts.slice(1).join(" ");
+          routeEl.textContent = "Destination: " + destination;
+          addLog(`📍 ${name} set destination to <b>${destination}</b>`);
         }
 
         if (cmd === "!reset") {
           resetTimer();
+          addLog(`🔄 ${name} reset the trip`);
         }
       });
     }
 
-    // ✅ Buttons
+    // Buttons
     document.getElementById("connectBtn").addEventListener("click", () => {
       const ch = document.getElementById("channelInput").value.trim().toLowerCase();
       if (ch) connectTwitch(ch);
@@ -242,6 +284,7 @@
       if (client) {
         try { client.disconnect(); } catch(e){}
         statusEl.textContent = "🔌 Disconnected";
+        addLog("🔌 Disconnected from chat");
       }
     });
   </script>
