@@ -80,7 +80,6 @@
   <script>
     let client = null;
     let totalSeconds = 600; 
-    let remainingSeconds = totalSeconds;
     let endTime = Date.now() + totalSeconds * 1000;
     let lastUpdateExtra = 0;
 
@@ -103,19 +102,19 @@
 
     function tick() {
       const now = Date.now();
-      remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
-      const elapsed = totalSeconds - remainingSeconds;
+      const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+      const elapsed = totalSeconds - remaining;
       const pct = totalSeconds > 0 ? Math.min(100, (elapsed / totalSeconds) * 100) : 0;
 
       fillEl.style.width = pct + "%";
 
       const barRect = barEl.getBoundingClientRect();
-      const carW = carEl.getBoundingClientRect().width;
+      const carW = carEl.getBoundingClientRect().width || 70;
       const usable = Math.max(0, barRect.width - carW);
       carEl.style.left = usable * (pct / 100) + carW / 2 + "px";
 
-      if (remainingSeconds > 0) {
-        let text = formatETA(remainingSeconds);
+      if (remaining > 0) {
+        let text = formatETA(remaining);
         if (lastUpdateExtra !== 0) {
           const sign = lastUpdateExtra > 0 ? "+" : "";
           text += ` (Updated ${sign}${lastUpdateExtra}s)`;
@@ -129,14 +128,14 @@
     tick();
 
     function resetTimer() {
-      totalSeconds = 0;
-      remainingSeconds = 0;
+      totalSeconds = 600;
+      endTime = Date.now() + totalSeconds * 1000;
       lastUpdateExtra = 0;
-      endTime = Date.now();
       fillEl.style.width = "0%";
       carEl.style.left = "0px";
       etaEl.textContent = "ETA 0m";
       routeEl.textContent = "Destination: Not Set";
+      tick();
     }
 
     function connectToChat(channelName) {
@@ -144,13 +143,9 @@
         try { client.disconnect(); } catch(e){}
       }
 
-      // ✅ anonymous "justinfan" login
+      // ✅ Anonymous login (no identity)
       client = new tmi.Client({
         connection: { secure: true, reconnect: true },
-        identity: {
-          username: "justinfan" + Math.floor(Math.random()*80000),
-          password: "SCHMOOPIIE"
-        },
         channels: [channelName]
       });
 
@@ -170,16 +165,10 @@
         const parts = text.split(" ");
         const cmd = parts[0].toLowerCase();
 
-        console.log("CHAT:", tags.username, text); // debug
-
         if (cmd === "!st" && parts[1]) {
           const changeSecs = parseInt(parts[1], 10);
           if (!isNaN(changeSecs)) {
-            const now = Date.now();
-            const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
-            remainingSeconds = Math.max(0, currentRemaining + changeSecs);
-            totalSeconds = remainingSeconds;
-            endTime = now + remainingSeconds * 1000;
+            endTime += changeSecs * 1000;
             lastUpdateExtra = changeSecs;
             tick();
           }
