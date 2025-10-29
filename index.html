@@ -3,7 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <title>Car ETA Bar</title>
-  <link rel="stylesheet" href="style.css">
+  <style>
+    :root {
+      --track: rgba(255,255,255,.15);
+      --fill: #2b67f6;
+      --text: #ffffff;
+      --height: 40px;
+      --radius: 12px;
+    }
+
+    body {
+      margin:0; font-family: Inter, sans-serif; color: var(--text); background:transparent;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      height:100vh;
+    }
+
+    .bar-wrap {
+      padding:8px 16px; background:rgba(0,0,0,0.35); border-radius:8px; 
+      display:flex; flex-direction:column; gap:6px; width:min(90vw,600px);
+    }
+    .header { display:flex; justify-content:space-between; font-size:14px; font-weight:600; }
+    .route { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .eta { opacity:.9; }
+    .bar {
+      position:relative; width:100%; height:var(--height); background:var(--track);
+      border-radius:var(--radius); overflow:hidden;
+    }
+    .fill {
+      position:absolute; inset:0; width:0%; background:var(--fill); transition:width .25s linear;
+    }
+    .car {
+      position:absolute; top:50%; transform:translate(-50%,-50%); width:70px; height:auto;
+    }
+    .car img { width:100%; height:auto; display:block; }
+
+    /* connection panel */
+    .connect-panel {
+      margin-top:12px; padding:10px; background:rgba(0,0,0,0.4); border-radius:6px;
+      display:flex; gap:8px; align-items:center; font-size:14px;
+    }
+    .connect-panel input {
+      padding:4px 6px; border-radius:4px; border:none;
+      outline:none; font-size:14px;
+    }
+    .connect-panel button {
+      padding:4px 10px; border:none; border-radius:4px;
+      background:#2b67f6; color:#fff; font-weight:bold; cursor:pointer;
+    }
+    #conn-status { font-size:13px; opacity:0.8; }
+  </style>
 </head>
 <body>
   <div class="bar-wrap">
@@ -18,10 +66,132 @@
       </div>
     </div>
   </div>
-  <div id="conn" style="font-size:12px;opacity:0.6;margin-top:8px;"></div>
 
-  <!-- Twitch chat client -->
+  <!-- connect panel -->
+  <div class="connect-panel">
+    <label for="channel">Channel:</label>
+    <input type="text" id="channel" placeholder="Enter Twitch username">
+    <button id="connect-btn">Connect</button>
+    <span id="conn-status">Not connected</span>
+  </div>
+
+  <!-- tmi.js -->
   <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
-  <script src="script.js"></script>
+  <script>
+    let client = null;
+    let totalSeconds = 600; 
+    let remainingSeconds = totalSeconds;
+    let endTime = Date.now() + totalSeconds * 1000;
+    let lastUpdateExtra = 0;
+
+    const routeEl = document.getElementById("route");
+    const etaEl = document.getElementById("eta");
+    const fillEl = document.getElementById("fill");
+    const carEl = document.getElementById("car");
+    const barEl = document.getElementById("bar");
+    const statusEl = document.getElementById("conn-status");
+
+    function formatETA(sec) {
+      if (sec <= 0) return "Arrived!";
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return `ETA ${h}h ${m}m ${s}s`;
+      if (m > 0) return `ETA ${m}m ${s}s`;
+      return `ETA ${s}s`;
+    }
+
+    function tick() {
+      const now = Date.now();
+      remainingSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+      const elapsed = totalSeconds - remainingSeconds;
+      const pct = totalSeconds > 0 ? Math.min(100, (elapsed / totalSeconds) * 100) : 0;
+
+      fillEl.style.width = pct + "%";
+
+      const barRect = barEl.getBoundingClientRect();
+      const carW = carEl.getBoundingClientRect().width;
+      const usable = Math.max(0, barRect.width - carW);
+      carEl.style.left = usable * (pct / 100) + carW / 2 + "px";
+
+      if (remainingSeconds > 0) {
+        let text = formatETA(remainingSeconds);
+        if (lastUpdateExtra !== 0) {
+          const sign = lastUpdateExtra > 0 ? "+" : "";
+          text += ` (Updated ${sign}${lastUpdateExtra}s)`;
+        }
+        etaEl.textContent = text;
+        requestAnimationFrame(tick);
+      } else {
+        etaEl.textContent = "Arrived!";
+      }
+    }
+    tick();
+
+    function resetTimer() {
+      totalSeconds = 0;
+      remainingSeconds = 0;
+      lastUpdateExtra = 0;
+      endTime = Date.now();
+      fillEl.style.width = "0%";
+      carEl.style.left = "0px";
+      etaEl.textContent = "ETA 0m";
+      routeEl.textContent = "Destination: Not Set";
+    }
+
+    function connectToChat(channelName) {
+      if (client) {
+        try { client.disconnect(); } catch(e){}
+      }
+
+      client = new tmi.Client({
+        connection: { secure: true, reconnect: true },
+        channels: [channelName]
+      });
+
+      client.connect()
+        .then(() => { statusEl.textContent = `Connected to: ${channelName}`; })
+        .catch(() => { statusEl.textContent = 'Failed to connect'; });
+
+      client.on('message', (chan, tags, msg, self) => {
+        if(self) return;
+        const text = msg.trim();
+        const parts = text.split(" ");
+        const cmd = parts[0].toLowerCase();
+
+        // !st <seconds>
+        if (cmd === "!st" && parts[1]) {
+          const changeSecs = parseInt(parts[1], 10);
+          if (!isNaN(changeSecs)) {
+            const now = Date.now();
+            const currentRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
+            remainingSeconds = Math.max(0, currentRemaining + changeSecs);
+            totalSeconds = remainingSeconds;
+            endTime = now + remainingSeconds * 1000;
+            lastUpdateExtra = changeSecs;
+            tick();
+          }
+        }
+
+        // !sd <destination>
+        if (cmd === "!sd" && parts.length > 1) {
+          const destination = parts.slice(1).join(" ");
+          routeEl.textContent = "Destination: " + destination;
+        }
+
+        // !reset
+        if (cmd === "!reset") {
+          resetTimer();
+        }
+      });
+    }
+
+    document.getElementById("connect-btn").addEventListener("click", () => {
+      const channel = document.getElementById("channel").value.trim().toLowerCase();
+      if(channel) {
+        connectToChat(channel);
+      }
+    });
+  </script>
 </body>
 </html>
