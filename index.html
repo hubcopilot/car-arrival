@@ -144,8 +144,13 @@
         try { client.disconnect(); } catch(e){}
       }
 
+      // ✅ anonymous "justinfan" login
       client = new tmi.Client({
         connection: { secure: true, reconnect: true },
+        identity: {
+          username: "justinfan" + Math.floor(Math.random()*80000),
+          password: "SCHMOOPIIE"
+        },
         channels: [channelName]
       });
 
@@ -165,7 +170,7 @@
         const parts = text.split(" ");
         const cmd = parts[0].toLowerCase();
 
-        console.log("CHAT:", tags.username, text); // debug log
+        console.log("CHAT:", tags.username, text); // debug
 
         if (cmd === "!st" && parts[1]) {
           const changeSecs = parseInt(parts[1], 10);
@@ -191,7 +196,6 @@
       });
     }
 
-    // ✅ fix: ensure DOM ready before attaching
     window.onload = function() {
       document.getElementById("connect-btn").addEventListener("click", () => {
         const channel = document.getElementById("channel").value.trim().toLowerCase();
